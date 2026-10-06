@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:,">
+<title>CLAMQUEST — Pixel Reef RPG</title>
+<style>
+  :root{
+    --deep:#062a3a; --deep2:#041c28; --panel:#0a3549; --panel2:#083043;
+    --line:#e8f4f8; --teal:#2dd4bf; --coral:#ff7a59; --amber:#ffc94d;
+    --ink:#eaf7fb; --dim:#8fc3d4; --red:#ff5d4f; --green:#5ee08a;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--deep2);color:var(--ink);overflow-x:hidden;
+    font-family:"Courier New",ui-monospace,Menlo,monospace;}
+  canvas#game{touch-action:none}
+  body{min-height:100vh;display:flex;flex-direction:column;align-items:center;
+    background:var(--deep2) repeating-linear-gradient(0deg,transparent 0 3px,rgba(0,0,0,.14) 3px 4px);}
+  /* ---------- top bar ---------- */
+  header{width:min(1180px,96vw);display:flex;gap:10px;align-items:stretch;flex-wrap:wrap;margin-top:12px}
+  .box{background:var(--panel);border:3px solid var(--line);box-shadow:0 4px 0 #000;padding:8px 12px}
+  .logo{font-weight:700;font-size:22px;letter-spacing:2px;line-height:1}
+  .logo span{color:var(--teal)} .logo small{display:block;font-size:10px;letter-spacing:3px;color:var(--amber);margin-top:4px}
+  .grow{flex:1;min-width:260px}
+  .barwrap{margin:4px 0}
+  .barwrap label{font-size:10px;letter-spacing:2px;color:var(--dim);display:flex;justify-content:space-between}
+  .bar{height:14px;border:2px solid var(--line);background:#02141d;position:relative}
+  .bar i{position:absolute;inset:0;transform-origin:left;background:var(--green)}
+  .bar.hp i{background:var(--coral)} .bar.xp i{background:var(--teal)}
+  .stats{display:flex;gap:14px;font-size:12px;flex-wrap:wrap;align-items:center}
+  .stats b{color:var(--amber);font-size:15px}
+  button{font:inherit;font-weight:700;letter-spacing:1px;background:var(--panel2);color:var(--ink);
+    border:3px solid var(--line);box-shadow:0 3px 0 #000;padding:8px 12px;cursor:pointer;text-transform:uppercase;font-size:12px}
+  button:hover{background:var(--teal);color:#04222e}
+  button:active{transform:translateY(2px);box-shadow:0 1px 0 #000}
+  button:disabled{opacity:.35;cursor:not-allowed}
+  /* ---------- stage ---------- */
+  #stage{width:min(1180px,96vw);margin-top:10px;position:relative}
+  canvas#game{width:100%;height:auto;display:block;border:3px solid var(--line);box-shadow:0 6px 0 #000;
+    background:#07304a;image-rendering:pixelated;image-rendering:crisp-edges}
+  /* ---------- overlays ---------- */
+  .overlay{position:absolute;inset:0;display:none;place-items:center;text-align:center;padding:18px;z-index:5}
+  .overlay.on{display:grid}
+  .overlay .card{background:rgba(4,28,40,.93);border:3px solid var(--line);box-shadow:0 6px 0 #000;
+    padding:22px 26px;max-width:640px;width:100%}
+  .overlay h1{margin:0 0 6px;font-size:34px;letter-spacing:3px}
+  .overlay h1 span{color:var(--teal)}
+  .overlay p{font-size:13px;line-height:1.7;color:var(--dim)}
+  .overlay p b{color:var(--ink)}
+  .bigbtn{font-size:16px;padding:14px 28px;background:var(--coral);color:#2b0f08;border-color:#fff}
+  .bigbtn:hover{background:var(--amber);color:#2b0f08}
+  #titleVid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.5;z-index:-1}
+  .keys{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:10px 0;font-size:11px}
+  .keys span{border:2px solid var(--dim);padding:3px 8px;background:#02141d}
+  .keys b{color:var(--amber)}
+  /* ---------- lower deck ---------- */
+  #deck{width:min(1180px,96vw);display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 16px}
+  #abilities{display:contents}
+  .ab{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;font-size:11px;white-space:nowrap}
+  .ab .ic{font-size:16px;line-height:1}
+  .ab .key{color:var(--amber);font-size:10px;border:1px solid var(--dim);padding:0 4px}
+  .ab.locked{opacity:.35;filter:grayscale(1)}
+  #critList{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start}
+  .crit{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:9px;padding:0;text-align:center;width:58px;color:var(--dim)}
+  .crit img{width:40px;height:40px;object-fit:cover;border:2px solid var(--line);background:#ff00ff;image-rendering:pixelated}
+  .crit .nm{font-weight:700;color:var(--ink);line-height:1.25}
+  .crit.done{opacity:.55} .crit.done .nm{text-decoration:line-through}
+  .crit .st{font-size:11px}
+  #feed{flex-basis:100%;font-size:11px;min-height:15px;color:var(--dim);padding:5px 10px}
+  #feed b{color:var(--green)} #feed .bad{color:var(--red)} #feed .gold{color:var(--amber)}
+  #bossWrap{display:none;position:absolute;top:8px;left:8px;right:8px;z-index:4}
+  #bossWrap.on{display:block}
+  #fade{position:absolute;inset:0;background:#eaf7fb;opacity:0;pointer-events:none;transition:opacity .18s;z-index:6}
+  #fade.on{opacity:1}
+  #bossWrap label{font-size:11px;letter-spacing:2px;color:var(--red);display:flex;justify-content:space-between}
+  .bar.boss i{background:var(--red)}
+  .bar.stag i{background:var(--amber)}
+  #banner{position:absolute;top:16%;left:50%;transform:translateX(-50%);z-index:4;display:none;
+    background:#7a1d16;border:3px solid #fff;color:#fff;font-weight:700;letter-spacing:1px;
+    padding:10px 22px;font-size:18px;text-align:center;box-shadow:0 4px 0 #000;max-width:90%}
+  #banner.good{background:#0b4f4a}
+  #banner.show{display:block}
+  #touch{display:none;gap:8px;flex-wrap:wrap;margin-top:8px}
+  @media(pointer:coarse){ #touch{display:flex} }
+  #touch button{flex:1;padding:14px 6px;font-size:14px}
+  footer{font-size:11px;color:var(--dim);padding:0 0 18px;text-align:center;line-height:1.8;width:min(1180px,96vw)}
+  footer b{color:var(--amber)}
+</style>
+</head>
+<body>
+<header>
+  <div class="box logo">CLAM<span>QUEST</span><small>PIXEL REEF RPG</small></div>
+  <div class="box grow">
+    <div class="barwrap"><label><span>SHELL (HP)</span><span id="hpTxt">60 / 60</span></label>
+      <div class="bar hp"><i id="hpBar"></i></div></div>
+    <div class="barwrap"><label><span>POWER (XP)</span><span id="xpTxt">Lv 1</span></label>
+      <div class="bar xp"><i id="xpBar"></i></div></div>
+    <div class="stats">
+      <span>SIZE <b id="sizeTxt">42 cm</b></span>
+      <span>POWER <b id="powTxt">1</b></span>
+      <span>EATEN <b id="eatTxt">0 / 5</b></span>
+      <span>SCORE <b id="scoreTxt">0</b></span>
+    </div>
+  </div>
+  <div class="box" style="display:flex;flex-direction:column;gap:8px;justify-content:center">
+    <button id="musicBtn">♪ MUSIC: ON</button>
+    <button id="pauseBtn">❚❚ PAUSE [P]</button>
+    <button id="restartBtn">↻ RESTART</button>
+  </div>
+</header>
+
+<div id="stage">
+  <canvas id="game" width="960" height="540"></canvas>
+  <div id="bossWrap" class="box">
+    <label><span>✋ THE CLAMMER'S HAND</span><span id="bossTxt"></span></label>
+    <div class="bar boss"><i id="bossBar"></i></div>
+    <label style="margin-top:5px"><span>STAGGER → DOWN → ATTACK</span><span id="stagTxt"></span></label>
+    <div class="bar stag"><i id="stagBar"></i></div>
+  </div>
+  <div id="banner"></div>
+  <div id="fade"></div>
+
+  <div class="overlay on" id="titleScr">
+    <video id="titleVid" autoplay muted loop playsinline src="assets/intro-loop.mp4"></video>
+    <div class="card">
+      <h1>CLAM<span>QUEST</span></h1>
+      <p>Defeat the five <b>Elder Creatures</b>, devour their magic, grow huge — then face <b>the Giant Hand of the Clammer</b>.</p>
+      <div class="keys">
+        <span><b>WASD / ←↑→↓</b> swim</span><span><b>SPACE</b> chomp</span>
+        <span><b>J</b> fire</span><span><b>K</b> dash</span><span><b>L</b> nova</span>
+        <span><b>Q</b> field</span><span><b>P</b> pause</span><span><b>M</b> mute</span>
+      </div>
+      <button class="bigbtn" id="startBtn">▶ &nbsp;DIVE IN</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="endScr">
+    <div class="card">
+      <h1 id="endTitle">SHELL CRACKED!</h1>
+      <p id="endText"></p>
+      <p id="endScore" style="color:var(--amber);font-size:15px"></p>
+      <button class="bigbtn" id="againBtn">↻ &nbsp;SWIM AGAIN</button>
+    </div>
+  </div>
+</div>
+
+<div id="deck">
+  <div class="box" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1;min-width:280px">
+    <b style="font-size:10px;letter-spacing:2px;color:var(--amber)">POWERS</b>
+    <div id="abilities"></div>
+    <div id="touch">
+      <button data-k="left">◀</button><button data-k="up">▲ JET</button><button data-k="right">▶</button>
+      <button data-k="bite">CHOMP</button><button data-k="fire">FIRE</button>
+      <button data-k="dash">DASH</button><button data-k="nova">NOVA</button><button data-k="veil">FIELD</button>
+    </div>
+  </div>
+  <div class="box" style="display:flex;align-items:center;gap:8px">
+    <b style="font-size:10px;letter-spacing:2px;color:var(--amber)">ELDERS</b>
+    <div id="critList"></div>
+  </div>
+  <div class="box" id="feed">Press <b>DIVE IN</b>.</div>
+</div>
+
+<footer>CLAMQUEST · art by fal (FLUX Schnell + Nano Banana 2 sheet) · music/SFX live WebAudio · total art cost &lt; $0.50 of $20</footer>
+<script>
+'use strict';
+/* ================= sprites (fal FLUX Schnell, chroma-keyed) ================= */
+const cv = document.getElementById('game'), ctx = cv.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+const $ = id => document.getElementById(id);
+const SPR = {};
+function keyOut(img,crop){
+  const W0 = img.naturalWidth, H0 = img.naturalHeight;
+  const sy = crop ? Math.floor(H0*crop.t) : 0, sh = crop ? Math.floor(H0*(1-crop.t-crop.b)) : H0;
+  const c = document.createElement('canvas'); c.width = W0; c.height = sh;
+  const x = c.getContext('2d', { willReadFrequently:true }); x.drawImage(img,0,sy,W0,sh,0,0,W0,sh);
+  try{
+    const d = x.getImageData(0,0,c.width,c.height), p = d.data, W = c.width, H = c.height;
+    // key colour: edge sample with strongest magenta score (R-G)
+    let kr=255, kg=0, kb=255, best=-1e9;
+    const pts=[[4,H>>1],[W-5,H>>1],[W>>1,4],[W>>1,H-5],[4,4],[W-5,H-5]];
+    for(const [px,py] of pts){ const i=(py*W+px)*4, s=p[i]-p[i+1]; if(s>best){best=s;kr=p[i];kg=p[i+1];kb=p[i+2];} }
+    for(let i=0;i<p.length;i+=4){
+      const dr=p[i]-kr, dg=p[i+1]-kg, db=p[i+2]-kb, dist=Math.sqrt(dr*dr+dg*dg+db*db);
+      if(dist<55) p[i+3]=0; else if(dist<120) p[i+3]=Math.round((dist-55)/65*255);
+    }
+    x.putImageData(d,0,0);
+  }catch(e){ /* file:// taint: keep raw plate */ }
+  return c;
+}
+function loadSprites(done){
+  const files = { clam:'assets/clam.png', clamBite:'assets/clam-bite.png', clamClosed:'assets/clam-closed.png', sheet:'assets/clam-sheet.png',
+    ember:'assets/ember-crab.png', urchin:'assets/saw-urchin.png',
+    jelly:'assets/volt-jelly.png', angler:'assets/glow-angler.png', squid:'assets/phantom-squid.png',
+    teethSheet:'assets/clam-teeth-sheet.png',
+    hand:'assets/clammer-hand.png', handOpen:'assets/hand-open.png', handGrab:'assets/hand-grab.png',
+    handDown:'assets/hand-down.png', handHurt:'assets/hand-hurt.png', bg:'assets/bg-reef.png' };
+  const crops = { handOpen:{t:0.06,b:0.16}, handGrab:{t:0.06,b:0.16}, handHurt:{t:0.06,b:0.14} };
+  let left = Object.keys(files).length;
+  for(const [k,src] of Object.entries(files)){
+    const im = new Image();
+    im.onload = ()=>{ SPR[k]=keyOut(im,crops[k]); if(--left===0) done(); };
+    im.onerror = ()=>{ SPR[k]=null; if(--left===0) done(); };
+    im.src = src;
+  }
+}
+/* Slice a nano-banana sprite sheet into 4 same-clam poses by alpha-column gaps.
+   Base sheet order: open+pearl, plain closed, teeth bite, teeth grin.
+   Teeth sheet order: open+teeth+pearl, grin closed, teeth bite, grin closed. Falls back to old frames. */
+function segmentSheet(){
+  sliceSheet(SPR.sheet, ['clam','clamClosedPlain','clamBite','clamClosedTeeth']);
+  sliceSheet(SPR.teethSheet, ['tClam','tClosed','tBite','tGrin']);
+}
+function sliceSheet(src, roles){
+  if(!src) return;
+  try{
+    const W=src.width, H=src.height, x=src.getContext('2d',{willReadFrequently:true});
+    const d=x.getImageData(0,0,W,H).data, col=new Float32Array(W);
+    for(let px=0;px<W;px++){ let s=0; for(let py=0;py<H;py+=2){ if(d[(py*W+px)*4+3]>40) s++; } col[px]=s; }
+    const groups=[]; let start=-1;
+    for(let px=0;px<=W;px++){ const on=px<W&&col[px]>2;
+      if(on&&start<0) start=px;
+      if(!on&&start>=0){ if(px-start>40) groups.push([start,px]); start=-1; } }
+    /* merge groups separated by tiny gaps (motion marks) */
+    const merged=[];
+    for(const g of groups){ const last=merged[merged.length-1];
+      if(last&&g[0]-last[1]<26) last[1]=g[1]; else merged.push([...g]); }
+    if(merged.length!==4) return;
+    merged.forEach(([gx0,gx1],i)=>{
+      let miny=H, maxy=0;
+      for(let px=gx0;px<gx1;px++) for(let py=0;py<H;py+=2){ if(d[(py*W+px)*4+3]>40){ if(py<miny)miny=py; if(py>maxy)maxy=py; } }
+      miny=Math.max(0,miny-8); maxy=Math.min(H,maxy+8);
+      const c=document.createElement('canvas'); c.width=gx1-gx0; c.height=maxy-miny;
+      c.getContext('2d').drawImage(src,gx0,miny,gx1-gx0,maxy-miny,0,0,gx1-gx0,maxy-miny);
+      SPR[roles[i]]=c;
+    });
+  }catch(e){ /* keep fallback frames */ }
+}
+/* ================= RPG data ================= */
+const ELDERS = [
+  { id:'urchin', name:'Saw Urchin',    spr:'urchin', x:520,  y:410, ability:'teeth', key:'SPACE', icon:'🦷', hp:20, flee:62, spit:false,
+    aname:'SHELL TEETH', desc:'Your light chomp becomes a TEETH bite: lunging, shredding, deeply satisfying.' },
+  { id:'ember',  name:'Ember Crab',    spr:'ember',  x:1030, y:360, ability:'fire',  key:'J', icon:'🔥', hp:40, flee:118,
+    aname:'FIRE SHOT',  desc:'Shoot fireballs. Underwater. Do not question it.' },
+  { id:'jelly',  name:'Volt Jelly',    spr:'jelly',  x:1520, y:210, ability:'dash',  key:'K', icon:'⚡', hp:46, flee:108,
+    aname:'VOLT DASH',  desc:'Lightning dash with i-frames. Zaps anything you pass through.' },
+  { id:'angler', name:'Glow Angler',   spr:'angler', x:2050, y:330, ability:'nova',  key:'L', icon:'✦', hp:58, flee:112,
+    aname:'LANTERN NOVA', desc:'Radial lantern blast that clears the screen around you.' },
+  { id:'squid',  name:'Phantom Squid', spr:'squid',  x:2470, y:240, ability:'veil',  key:'Q', icon:'🛡️', hp:68, flee:132,
+    aname:'PHANTOM FORCE FIELD', desc:'Raise a force-field bubble for 3 s: nothing can touch you. Spam it. You earned it.' },
+];
+const WORLD_W = 3760, GATE_X = 2800, FLOOR = 486, SURF = 64;
+/* ================= audio: chiptune music + SFX (WebAudio) ================= */
+let AC=null, master=null, musicOn=true, musicTimer=null, mStep=0, bossMusic=false, menaceMusic=false;
+function audio(){ if(!AC){ AC=new (window.AudioContext||window.webkitAudioContext)(); master=AC.createGain(); master.gain.value=0.5; master.connect(AC.destination);} if(AC.state==='suspended') AC.resume(); }
+function tone(f,d=0.12,type='square',g=0.12,slide=0,when=0){
+  if(!AC) return;
+  const t0=AC.currentTime+when, o=AC.createOscillator(), gn=AC.createGain();
+  o.type=type; o.frequency.setValueAtTime(f,t0);
+  if(slide) o.frequency.exponentialRampToValueAtTime(Math.max(28,f+slide),t0+d);
+  gn.gain.setValueAtTime(g,t0); gn.gain.exponentialRampToValueAtTime(0.001,t0+d);
+  o.connect(gn); gn.connect(master); o.start(t0); o.stop(t0+d+0.02);
+}
+function noiseSfx(d=0.15,g=0.12,when=0){
+  if(!AC) return; const t0=AC.currentTime+when, len=Math.floor(AC.sampleRate*d);
+  const buf=AC.createBuffer(1,len,AC.sampleRate), ch=buf.getChannelData(0);
+  for(let i=0;i<len;i++) ch[i]=(Math.random()*2-1)*(1-i/len);
+  const s=AC.createBufferSource(); s.buffer=buf; const gn=AC.createGain(); gn.gain.value=g;
+  const f=AC.createBiquadFilter(); f.type='lowpass'; f.frequency.value=900;
+  s.connect(f); f.connect(gn); gn.connect(master); s.start(t0);
+}
+const mf = m => 440*Math.pow(2,(m-69)/12);
+/* reef theme (C major, bouncy) and boss theme (A minor, driving) — [melody,bass] midi per 8th */
+const THEME = { reef:{ bpm:132, mel:[72,0,76,79, 81,79,76,74, 72,0,76,79, 84,0,81,79, 77,0,81,84, 81,79,77,76, 74,76,72,0, 69,0,0,0],
+                        bass:[48,0,55,0, 53,0,55,0, 48,0,55,0, 53,0,55,0, 50,0,55,0, 53,0,55,0, 48,0,43,0, 45,0,0,0] },
+                boss:{ bpm:176, mel:[69,0,68,69, 0,75,0,74, 69,0,68,69, 0,80,79,75, 74,0,71,74, 0,68,0,64, 69,0,68,71, 74,0,63,0],
+                        bass:[45,45,45,45, 44,44,44,44, 41,41,41,41, 43,43,43,43, 45,45,45,45, 44,44,44,44, 38,38,40,40, 45,45,47,48] },
+                menace:{ bpm:84, mel:[45,0,0,44, 0,0,45,0, 41,0,0,40, 0,0,38,0, 45,0,0,44, 0,0,48,47, 44,0,40,0, 45,0,0,0],
+                        bass:[45,0,0,0, 44,0,0,0, 41,0,0,0, 43,0,0,0, 45,0,0,0, 44,0,0,0, 48,0,43,0, 45,0,0,0] } };
+let musNext=0;
+function startMusic(){ if(!AC||musicTimer) return; mStep=0; musNext=AC.currentTime+0.08;
+  musicTimer=setInterval(()=>{
+    if(!AC) return;
+    const th = bossMusic?THEME.boss:menaceMusic?THEME.menace:THEME.reef, spb=60/th.bpm/2;
+    while(musNext<AC.currentTime+0.18){
+      const when=Math.max(0,musNext-AC.currentTime), i=mStep%32;
+      if(musicOn&&G.mode!=='title'){
+        if(th.mel[i]) tone(mf(th.mel[i]), spb*0.9,'square', bossMusic?0.07:0.055, 0, when);
+        if(th.bass[i]) tone(mf(th.bass[i]-12), spb*0.95,'triangle', bossMusic?0.13:0.11, 0, when);
+        if(bossMusic){ /* intense: heartbeat kick + driving hats */
+          if(i%8===0){ tone(55,0.16,'sine',0.22,0,when); tone(55,0.14,'sine',0.17,0,when+spb*0.9); }
+          if(i%4===2) noiseSfx(0.03,0.02,when);
+          if(i===16) noiseSfx(0.25,0.05,when);
+        } else if(i%4===2) noiseSfx(0.03,0.018,when);
+      }
+      mStep++; musNext+=spb;
+    }
+  },80);
+}
+const SFX = {
+  eat(){ tone(840,0.07,'sine',0.09); tone(1180,0.09,'sine',0.07,0,0.05); },
+  elder(){ [523,659,784,1046,1318].forEach((f,i)=>tone(f,0.16,'square',0.09,0,i*0.09)); noiseSfx(0.3,0.05,0.1); },
+  fire(){ tone(320,0.16,'sawtooth',0.10,-210); noiseSfx(0.1,0.05); },
+  bite(){ tone(140,0.12,'square',0.14,-60); noiseSfx(0.08,0.10); },
+  dash(){ tone(500,0.22,'sawtooth',0.09,700); },
+  nova(){ tone(180,0.4,'sine',0.16,520); noiseSfx(0.35,0.10); },
+  veil(){ tone(900,0.3,'sine',0.08,-500); },
+  hurt(){ tone(150,0.28,'sawtooth',0.13,-70); },
+  die(){ tone(700,0.1,'square',0.08); tone(500,0.12,'square',0.08,0,0.1); },
+  boss(){ tone(70,0.9,'sawtooth',0.16,40); tone(74,0.9,'sawtooth',0.12,-20,0.15); noiseSfx(0.7,0.08,0.1); },
+  win(){ [523,659,784,1046,784,1046,1318].forEach((f,i)=>tone(f,0.22,'square',0.10,0,i*0.13)); },
+};
+/* ================= DOM helpers ================= */
+function feed(html){ const el=$('feed'); el.innerHTML=html; }
+let bannerT=null, bannerLockUntil=0;
+function banner(txt,good=false,ms=1700,prio=false){ const now=performance.now();
+  if(!prio&&now<bannerLockUntil) return; /* priority banners (elder unlocks) are not overwritten */
+  if(prio) bannerLockUntil=now+ms;
+  const b=$('banner'); b.textContent=txt; b.className='show'+(good?' good':'');
+  clearTimeout(bannerT); bannerT=setTimeout(()=>b.className='',ms); }
+/* ================= game state ================= */
+const G = { mode:'title', paused:false, camX:0, time:0, score:0, shake:0 };
+let P, plankton=[], elders=[], preds=[], shots=[], parts=[], bubbles=[], ebolts=[];
+let boss=null, spawnT=3;
+function playerBase(){ return { x:110, y:400, vx:0, vy:0, face:1, hp:60, maxHp:60, xp:0, level:1,
+  eaten:0, size:1, abilities:new Set(), fireCd:0, biteCd:0, dashCd:0, novaCd:0, veilCd:0, veilT:0, hurtT:0, dashT:0, biteAnimT:0, gapeT:0, grabbed:false }; }
+function reset(){
+  P = playerBase(); G.score=0; G.camX=0; G.shake=0; boss=null; bossMusic=false; menaceMusic=false; spawnT=3;
+  plankton=[]; for(let i=0;i<70;i++) plankton.push({ x:80+Math.random()*(WORLD_W-160), y:SURF+30+Math.random()*380, ph:Math.random()*6, got:false });
+  elders = ELDERS.map(e=>({ ...e, eaten:false, ph:Math.random()*6, wx:e.x, wy:e.y, hpCur:e.hp, flash:0, boltT:2, touchT:0 }));
+  preds=[]; shots=[]; parts=[]; ebolts=[];
+  bubbles=[]; for(let i=0;i<40;i++) bubbles.push({ x:Math.random()*WORLD_W, y:Math.random()*540, s:1+Math.random()*2.4, v:14+Math.random()*22 });
+  $('bossWrap').classList.remove('on'); $('endScr').classList.remove('on');
+  renderCodex(); renderAbilities(); hud();
+  feed('Elders glow east. <b>Defeat</b> one to devour its power — SPACE chomps. First up: the <b>Saw Urchin</b> (teeth!).');
+}
+function dmgMult(){ return 1 + (P.level-1)*0.25 + P.eaten*0.35; }
+function hurtPlayer(d,src){
+  if(P.veilT>0 || P.dashT>0 || G.mode!=='play'&&G.mode!=='boss') return;
+  P.hp -= d; P.hurtT=0.5; G.shake=7; SFX.hurt(); hud();
+  banner('OUCH! −'+d+' SHELL'); burst(P.x,P.y,'#ff5d4f',10);
+  if(P.hp<=0){ P.hp=0; gameEnd(false,'The reef keeps your shell as decor. '+src); }
+}
+/* ================= UI renders ================= */
+const SPRFILE = { ember:'ember-crab', urchin:'saw-urchin', jelly:'volt-jelly', angler:'glow-angler', squid:'phantom-squid' };
+function renderCodex(){
+  $('critList').innerHTML = ELDERS.map(e=>{
+    const got = elders.find(x=>x.id===e.id)?.eaten;
+    return `<div class="crit ${got?'done':''}" title="Defeat the ${e.name} → ${e.aname}"><img src="assets/${SPRFILE[e.spr]}.png" alt="">
+    <span class="nm">${e.name.replace(' ','<br>')}</span><span class="st">${got?'✓':'✦'}</span></div>`; }).join('');
+}
+function renderAbilities(){
+  $('abilities').innerHTML = ELDERS.map(e=>{
+    const has = P && P.abilities.has(e.ability);
+    return `<div class="ab box ${has?'':'locked'}" title="${e.desc}"><span class="ic">${e.icon}</span>${e.aname}<span class="key">${e.key}</span></div>`; }).join('');
+}
+function hud(){
+  if(!P) return;
+  $('hpBar').style.transform=`scaleX(${Math.max(0,P.hp/P.maxHp)})`;
+  $('hpTxt').textContent=`${Math.ceil(P.hp)} / ${P.maxHp}`;
+  const need=P.level*60;
+  $('xpBar').style.transform=`scaleX(${Math.min(1,P.xp/need)})`;
+  $('xpTxt').textContent=`Lv ${P.level} · ${Math.floor(P.xp)}/${need} XP`;
+  $('sizeTxt').textContent=Math.round(42*P.size)+' cm';
+  $('powTxt').textContent=P.level+' · ×'+dmgMult().toFixed(2);
+  $('eatTxt').textContent=P.eaten+' / 5';
+  $('scoreTxt').textContent=Math.floor(G.score);
+  if(boss) { $('bossBar').style.transform=`scaleX(${Math.max(0,boss.hp/boss.maxHp)})`;
+    $('bossTxt').textContent=Math.ceil(boss.hp)+' HP · DOWNED ×'+boss.cycles;
+    $('stagBar').style.transform=`scaleX(${boss.state==='downed'?1:Math.min(1,boss.stagger/100)})`;
+    $('stagTxt').textContent= boss.state==='grabbed' ? `MASH SPACE! ${boss.grabGot}/8` :
+      boss.state==='downed' ? `DOWN! ${Math.max(0,boss.t).toFixed(1)}s — ATTACK!` : 'STAGGER '+Math.round(boss.stagger)+'%'; }
+}
+/* ================= input ================= */
+const keys={};
+addEventListener('keydown',e=>{
+  if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault();
+  keys[e.code]=true;
+  if(e.code==='KeyP'&&(G.mode==='play'||G.mode==='boss')){ G.paused=!G.paused; $('pauseBtn').textContent=G.paused?'▶ RESUME [P]':'❚❚ PAUSE [P]'; }
+  if(e.code==='KeyM') toggleMusic();
+  if(G.mode==='play'||G.mode==='boss'){ if(!G.paused){
+    if(e.code==='Space') doBite();
+    if(e.code==='KeyJ') doFire();
+    if(e.code==='KeyK') doDash();
+    if(e.code==='KeyL') doNova();
+    if(e.code==='KeyQ') doVeil();
+  }}
+});
+addEventListener('keyup',e=>keys[e.code]=false);
+document.querySelectorAll('#touch button').forEach(b=>{
+  const k=b.dataset.k, dn=e=>{ e.preventDefault();
+    if(k==='left')keys.ArrowLeft=true; if(k==='right')keys.ArrowRight=true; if(k==='up')keys.ArrowUp=true;
+    if(k==='bite')doBite(); if(k==='fire')doFire(); if(k==='dash')doDash(); if(k==='nova')doNova(); if(k==='veil')doVeil(); };
+  const up=()=>{ if(k==='left')keys.ArrowLeft=false; if(k==='right')keys.ArrowRight=false; if(k==='up')keys.ArrowUp=false; };
+  b.addEventListener('pointerdown',dn); b.addEventListener('pointerup',up); b.addEventListener('pointerleave',up);
+});
+/* ================= abilities ================= */
+function burst(x,y,col,n=12,spd=160){ for(let i=0;i<n;i++){ const a=Math.random()*6.28, s=40+Math.random()*spd;
+  parts.push({ x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-30,t:0.5+Math.random()*0.4,col,s:2+Math.random()*3 }); } }
+function gainXP(n){ P.xp+=n; while(P.xp>=P.level*60){ P.xp-=P.level*60; P.level++; P.maxHp+=10; P.hp=Math.min(P.maxHp,P.hp+18);
+  P.size=1+P.eaten*0.16+(P.level-1)*0.03; banner('LEVEL '+P.level+'! BIGGER. MEANER. CLAMMIER.',true); SFX.elder(); burst(P.x,P.y,'#ffc94d',22); } hud(); }
+function doFire(){ if(!P.abilities.has('fire')||P.fireCd>0||G.paused) return; P.fireCd=0.12; SFX.fire();
+  shots.push({ x:P.x+P.face*34*P.size, y:P.y-4, vx:P.face*520, vy:0, t:1.1, col:'#ff9a3d', dmg:9*dmgMult(), r:7 }); }
+function doBite(){ if(boss&&boss.state==='grabbed'){ grabTap(); return; }
+  if(P.biteCd>0||G.paused) return; const hasTeeth=P.abilities.has('teeth');
+  P.biteCd=hasTeeth?0.16:0.24; P.biteAnimT=0.24; P.vx+=P.face*(hasTeeth?260:150); SFX.bite();
+  const dmg=(hasTeeth?16:8)*dmgMult(), reach=52*P.size;
+  let hit=false;
+  for(const pr of preds){ if(Math.abs(pr.x-(P.x+P.face*reach))<46&&Math.abs(pr.y-P.y)<52){ damagePred(pr,dmg); hit=true; } }
+  for(const e of elders){ if(e.eaten) continue; const bx=P.x+P.face*reach;
+    if((Math.abs(e.wx-bx)<52&&Math.abs(e.wy-P.y)<58)||Math.hypot(e.wx-P.x,e.wy-P.y)<50){ damageElder(e,dmg); hit=true; } }
+  if(boss&&bossHit(P.x+P.face*reach,P.y)){ damageBoss(hasTeeth?20:12); hit=true; }
+  if(hit) burst(P.x+P.face*40,P.y,'#ffffff',7,120); }
+function doDash(){ if(!P.abilities.has('dash')||P.dashCd>0||G.paused) return; P.dashCd=0.45; P.dashT=0.22; SFX.dash();
+  P.vx=P.face*760; burst(P.x,P.y,'#7df9ff',14,200);
+  for(const pr of preds) if(Math.abs(pr.x-P.x)<130&&Math.abs(pr.y-P.y)<60) damagePred(pr,12*dmgMult());
+  for(const e of elders) if(!e.eaten&&Math.abs(e.wx-P.x)<140&&Math.abs(e.wy-P.y)<64) damageElder(e,12*dmgMult()); }
+function doNova(){ if(!P.abilities.has('nova')||P.novaCd>0||G.paused) return; P.novaCd=1.4; SFX.nova(); G.shake=5;
+  burst(P.x,P.y,'#ffe9a0',36,300);
+  for(const pr of [...preds]) if(Math.hypot(pr.x-P.x,pr.y-P.y)<190) damagePred(pr,20*dmgMult());
+  for(const e of elders) if(!e.eaten&&Math.hypot(e.wx-P.x,e.wy-P.y)<200) damageElder(e,20*dmgMult());
+  if(boss){ const c=bossCenter(); if(Math.hypot(c.x-P.x,c.y-P.y)<320) damageBoss(22); } }
+function doVeil(){ if(!P.abilities.has('veil')||P.veilCd>0||G.paused) return; P.veilCd=2.4; P.veilT=3; SFX.veil();
+  feed('<b>🛡️ FORCE FIELD UP!</b> Nothing touches you for 3 s — not teeth, not fingers.'); }
+function devourElder(e){
+  e.eaten=true; P.biteAnimT=0.26; P.eaten++; P.abilities.add(e.ability); P.maxHp+=14; P.hp=Math.min(P.maxHp,P.hp+30);
+  P.size=1+P.eaten*0.16+(P.level-1)*0.03; G.score+=200; gainXP(30); SFX.elder();
+  burst(e.wx,e.wy,'#ffc94d',30,260);
+  banner(`${e.icon} DEVOURED ${e.name.toUpperCase()}! ${e.aname} UNLOCKED [${e.key}]`,true,2600,true);
+  feed(`<span class="gold">✦ ${e.name} defeated and devoured!</span> <b>${e.aname}</b> — ${e.desc} Max HP +14. (${P.eaten}/5)`);
+  renderCodex(); renderAbilities(); hud();
+  if(P.eaten>=5){ setTimeout(()=>{ if(G.mode==='play'&&P.eaten>=5){ banner('ALL FIVE POWERS CLAIMED — SWIM RIGHT. FACE THE HAND. ✋',true,3200,true);
+    feed('<span class="gold">✋ THE CLAMMER STIRS ABOVE…</span> Swim to the far-right shallows. End this.'); } }, 3000); }
+}
+function damageElder(e,d){ if(!e||e.eaten) return; e.hpCur-=d; e.flash=0.15; burst(e.wx,e.wy,'#ffd9d4',7,150);
+  if(e.hpCur<=0) devourElder(e); else if(Math.random()<0.3) feed(`<b>${e.name}</b> HP ${Math.ceil(e.hpCur)}/${e.hp} — it flees! Corner it and keep hitting!`); }
+function damagePred(pr,d){ pr.hp-=d; pr.flash=0.15; burst(pr.x,pr.y,'#ffd9d4',6,130);
+  if(pr.hp<=0){ pr.dead=true; G.score+=40; gainXP(14); SFX.die(); burst(pr.x,pr.y,'#ff7a59',18,220);
+    P.hp=Math.min(P.maxHp,P.hp+3); feed('<b>Predator shredded!</b> +40 · +14 XP · a nibble of revenge (+3 HP)'); hud(); } }
+function bossCenter(){ if(!boss) return {x:0,y:0};
+  return boss.state==='downed'||boss.state==='crash' ? { x:boss.x, y:FLOOR-70 } : { x:boss.x, y:boss.y+200 }; }
+function bossHit(x,y){ if(!boss) return false; const c=bossCenter();
+  if(boss.state==='downed'||boss.state==='crash') return Math.abs(x-c.x)<190 && Math.abs(y-c.y)<120;
+  if(['enter','hover','aim','slam','stuck'].includes(boss.state)) return Math.abs(x-boss.x)<150 && y>boss.y-10 && y<boss.y+410;
+  return false; }
+function crashHand(){ if(!boss||boss.state==='downed'||boss.state==='crash') return;
+  boss.state='crash'; boss.t=0.6; SFX.boss(); G.shake=8;
+  banner('✋ HAND DOWN! GO TO TOWN ON IT!',true,1900,true);
+  feed('<b>✋ CRASHED TO THE SEABED!</b> Bite and burn it NOW — this is where the <b>real damage</b> happens!'); }
+function damageBoss(d){ if(!boss||boss.state==='grabbed'||boss.state==='rise') return;
+  if(boss.state==='downed'){
+    const real=Math.min(d, 100-boss.phaseDmg); /* 100 real dmg per downed window → ~5 cycles for 500 HP */
+    boss.hp-=real; boss.phaseDmg+=real; boss.flash=0.15; burst(boss.x,FLOOR-50,'#ffc94d',10,220);
+    if(boss.phaseDmg>=100&&boss.hp>0){ boss.state='rise'; boss.t=1; banner('THE HAND RECOVERS…',false,1100); }
+  } else {
+    boss.stagger+=d; boss.flash=0.12; burst(boss.x,boss.y+270,'#7df9ff',6,160);
+    if(boss.stagger>=100) crashHand();
+  }
+  hud();
+  if(boss.hp<=0){ G.score+=1000; gameEnd(true,'You bit, burned and zapped the Hand until it retreated to the surface, empty-fingered. The reef is yours. Forever. Probably.'); } }
+function grabTap(){ if(!boss||boss.state!=='grabbed') return false;
+  boss.grabGot++; G.shake=6; SFX.bite(); burst(P.x,P.y,'#ffffff',6,150); hud();
+  if(boss.grabGot>=8){ P.grabbed=false; boss.stagger+=35;
+    banner('💪 SHAKEN FREE!',true,1500,true);
+    feed('<b>✋ SHAKEN FREE!</b> The fingers slip on your shell — the Hand is rattled (+35 stagger).');
+    if(boss.stagger>=100) crashHand(); else { boss.state='rise'; boss.t=1; } }
+  return true; }
+/* ================= spawning ================= */
+function spawnPred(){
+  /* spawn just off-screen near the player so encounters (and species variety) actually happen */
+  const side = Math.max(40, Math.min(WORLD_W-40, P.x + (Math.random()<0.5?-1:1)*(640+Math.random()*280)));
+  const deep = 0.4+P.eaten*0.16+P.level*0.05;
+  const kinds=[ {kind:'fish', col:'#e8763a',hp:22,spd:95,dmg:9,w:0.34}, {kind:'crab', col:'#d94f3f',hp:32,spd:58,dmg:11,w:0.18},
+    {kind:'jelly', col:'#ff7ad9',hp:18,spd:52,dmg:13,w:0.16}, {kind:'ray', col:'#5b8fb9',hp:26,spd:138,dmg:10,w:0.16},
+    {kind:'octo', col:'#b84a39',hp:28,spd:74,dmg:12,w:0.16} ];
+  /* shuffle-bag: every 6 spawns contain all five species (fish twice) — variety is guaranteed, not luck */
+  if(!spawnPred.bag||!spawnPred.bag.length) spawnPred.bag=['fish','fish','crab','jelly','ray','octo'].sort(()=>Math.random()-0.5);
+  const want=spawnPred.bag.pop(); const k=kinds.find(kk=>kk.kind===want)||kinds[0];
+  const y = k.kind==='crab' ? FLOOR-20 : k.kind==='ray' ? FLOOR-60-Math.random()*40 : SURF+60+Math.random()*330;
+  preds.push({ x:side, y, vx:0, kind:k.kind, t:0, hp:k.hp*(1+deep*0.4), maxHp:k.hp*(1+deep*0.4),
+    spd:k.spd*(1+deep*0.25), dmg:k.dmg, col:k.col, ph:Math.random()*6, biteT:0, flash:0, dead:false });
+}
+/* ================= update ================= */
+function update(dt){
+  G.time+=dt;
+  for(const k of ['fireCd','biteCd','dashCd','novaCd','veilCd','veilT','hurtT','dashT','biteAnimT','gapeT']) P[k]=Math.max(0,P[k]-dt);
+  /* grabbed: no swimming — you are clam-kidnapped */
+  if(P.grabbed&&boss){ P.vx=0; P.vy=0; P.x=boss.x+(Math.random()-0.5)*5; P.y=FLOOR-58; }
+  /* movement: clam jets by clapping — buoyant, draggy */
+  const L=!P.grabbed&&(keys.ArrowLeft||keys.KeyA), R=!P.grabbed&&(keys.ArrowRight||keys.KeyD), U=!P.grabbed&&(keys.ArrowUp||keys.KeyW), D=!P.grabbed&&(keys.ArrowDown||keys.KeyS);
+  const ACC=P.veilT>0?760:620, MAX=P.veilT>0?330:265;
+  if(L){P.vx-=ACC*dt;P.face=-1;} if(R){P.vx+=ACC*dt;P.face=1;}
+  if(U)P.vy-=880*dt; if(D)P.vy+=640*dt;
+  P.vy+=120*dt; /* gentle sink */
+  P.vx*=Math.pow(0.12,dt); P.vy*=Math.pow(0.16,dt);
+  P.vx=Math.max(-MAX-((P.dashT>0)?520:0),Math.min(MAX+((P.dashT>0)?520:0),P.vx));
+  P.x+=P.vx*dt; P.y+=P.vy*dt;
+  P.x=Math.max(30,Math.min(WORLD_W-30,P.x)); P.y=Math.max(SURF+22,Math.min(FLOOR-16,P.y));
+  if(G.mode==='boss') P.x=Math.max(GATE_X+50,Math.min(WORLD_W-50,P.x)); /* arena walls */
+  if(Math.random()<dt*7) bubbles.push({ x:P.x+(Math.random()-0.5)*20, y:P.y-16, s:1+Math.random()*2, v:30+Math.random()*26 });
+  /* plankton */
+  for(const f of plankton){ if(f.got) continue;
+    if(Math.hypot(f.x-P.x,f.y-P.y)<30*P.size+8){ f.got=true; P.gapeT=0.34; /* gentle open→close gape, not a chomp */ P.hp=Math.min(P.maxHp,P.hp+2); G.score+=5; gainXP(4); SFX.eat();
+      if(Math.random()<0.16) feed('<b>+5 Plankton!</b> Filtered. Delicious. +2 HP'); hud(); } }
+  if(plankton.every(f=>f.got)) for(const f of plankton){ f.got=false; f.x=80+Math.random()*(WORLD_W-160); f.y=SURF+30+Math.random()*380; }
+  /* elders: mini-bosses — they FLEE, spit, and must be defeated before devouring */
+  for(const e of elders){ if(e.eaten) continue;
+    e.flash=Math.max(0,e.flash-dt); e.touchT-=dt; e.boltT-=dt;
+    const dx=P.x-e.wx, dy=P.y-e.wy, dist=Math.hypot(dx,dy)||1;
+    if(dist<200){ /* flee from the clam */
+      e.wx-=dx/dist*e.flee*dt; e.wy-=dy/dist*e.flee*dt*0.8;
+      e.wx=Math.max(e.x-300,Math.min(e.x+300,e.wx)); e.wy=Math.max(SURF+36,Math.min(FLOOR-28,e.wy));
+      if(e.spit!==false&&dist<290&&e.boltT<=0){ e.boltT=2.6; ebolts.push({ x:e.wx, y:e.wy, vx:dx/dist*175, vy:dy/dist*175, t:3 }); }
+      if(dist<42&&e.touchT<=0){ e.touchT=1.2; hurtPlayer(4, e.name+' nips you! Fight it — SPACE to chomp!'); }
+    } else { /* calm wander around home */
+      const tx=e.x+Math.sin(G.time*0.5+e.ph)*46, ty=e.y+Math.cos(G.time*0.7+e.ph)*20;
+      e.wx+=(tx-e.wx)*Math.min(1,dt*1.4); e.wy+=(ty-e.wy)*Math.min(1,dt*1.4);
+    }
+  }
+  for(const b of ebolts){ b.x+=b.vx*dt; b.y+=b.vy*dt; b.t-=dt;
+    if(Math.hypot(b.x-P.x,b.y-P.y)<26*P.size){ b.t=0; hurtPlayer(6,'Elder spit! Defeat it to claim its power.'); } }
+  ebolts=ebolts.filter(b=>b.t>0);
+  /* menacing music as you near the shallows */
+  if(!menaceMusic&&P.x>GATE_X-140){ menaceMusic=true; banner('THE SHALLOWS… SOMETHING MOVES ABOVE.',false,2600);
+    feed('<span class="bad">♪ The music turns wrong.</span> Bright, shallow water ahead — no cover, no mercy.'); SFX.boss(); }
+  /* boss trigger: enter the arena shallows once powered */
+  if(G.mode==='play'&&P.eaten>=5&&P.x>GATE_X+60) startBoss();
+  if(G.mode==='play'&&P.eaten<5&&P.x>GATE_X-30){ P.x=GATE_X-30;
+    if(Math.random()<0.02) feed('<span class="bad">A shadow passes overhead…</span> You are NOT ready. Devour all <b>five Elders</b> first.'); }
+  /* predators */
+  spawnT-=dt; const cap=2+P.eaten+Math.floor(P.level/2);
+  if(spawnT<=0&&preds.length<cap&&(G.mode==='play')){ spawnPred(); spawnT=Math.max(1.8,3.8-P.eaten*0.3)+Math.random()*1.5; }
+  for(const pr of preds){ if(pr.dead) continue; pr.flash=Math.max(0,pr.flash-dt); pr.biteT-=dt; pr.t+=dt;
+    const dx=P.x-pr.x, dy=P.y-pr.y, d=Math.hypot(dx,dy)||1, mx=dx/d, my=dy/d;
+    let vx=mx*pr.spd, vy=my*pr.spd;
+    if(pr.kind==='crab'){ vy=(FLOOR-20-pr.y)*2.4; }
+    else if(pr.kind==='jelly'){ vy=my*pr.spd+Math.sin(G.time*2.4+pr.ph)*34; }
+    else if(pr.kind==='ray'){ vy=dy*0.55+Math.sin(G.time*3+pr.ph)*26; }
+    else if(pr.kind==='octo'){ const dart=(pr.t%1.7)>1.25; const sp=pr.spd*(dart?2.7:0.35); vx=mx*sp; vy=my*sp; }
+    pr.x+=vx*dt; pr.y+=vy*dt; pr.y=Math.max(SURF+18,Math.min(FLOOR-8,pr.y)); pr.face=dx<0?-1:1;
+    if(Math.abs(pr.x-P.x)>1100) pr.dead=true; /* distant followers give up, freeing the spawn cap */
+    if(d<40*P.size&&pr.biteT<=0){ pr.biteT=0.9; hurtPlayer(pr.dmg,'A predator got its teeth in.'); } }
+  preds=preds.filter(p=>!p.dead);
+  /* shots */
+  for(const s of shots){ s.x+=s.vx*dt; s.t-=dt; burst(s.x,s.y,'#ff9a3d',1,30);
+    for(const e of elders){ if(!e.eaten&&Math.hypot(e.wx-s.x,e.wy-s.y)<38){ damageElder(e,s.dmg); s.t=0; break; } }
+    if(s.t<=0) continue;
+    for(const pr of preds){ if(!pr.dead&&Math.hypot(pr.x-s.x,pr.y-s.y)<30){ damagePred(pr,s.dmg); s.t=0; break; } }
+    if(boss&&bossHit(s.x,s.y)){ damageBoss(9); s.t=0; } }
+  shots=shots.filter(s=>s.t>0&&s.x>-40&&s.x<WORLD_W+40);
+  /* particles + bubbles */
+  for(const p of parts){ p.t-=dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy-=40*dt; }
+  parts=parts.filter(p=>p.t>0);
+  for(const b of bubbles){ b.y-=b.v*dt; b.x+=Math.sin(G.time*2+b.y*0.05)*8*dt; if(b.y<SURF-8){ b.y=FLOOR-6; b.x=Math.random()*WORLD_W; } }
+  if(boss) updateBoss(dt);
+  const camT = G.mode==='boss' ? WORLD_W-960 : Math.max(0,Math.min(WORLD_W-960,P.x-480)); /* arena = one locked screen */
+  G.camX += (camT-G.camX)*Math.min(1,dt*5);
+  G.shake=Math.max(0,G.shake-dt*22);
+  hud();
+}
+/* ================= FINAL BOSS: the Clammer's Hand ================= */
+const HOVER_Y = 2, SLAM_Y = FLOOR - 392;
+function startBoss(){
+  G.mode='boss'; bossMusic=true; menaceMusic=true;
+  /* hard transition into a NEW arena: fade, teleport to the shallows bowl, snapped camera, clear field */
+  preds=[]; ebolts=[];
+  P.x=GATE_X+150; P.y=360; P.vx=0; P.vy=0; G.camX=WORLD_W-960;
+  const fd=$('fade'); fd.classList.add('on'); setTimeout(()=>fd.classList.remove('on'),260);
+  boss={ x:P.x, y:-430, hp:500, maxHp:500, stagger:0, phaseDmg:0, cycles:0, state:'enter', t:1.6, flash:0, tx:P.x, grabGot:0 };
+  $('bossWrap').classList.add('on'); SFX.boss();
+  banner('✋ FINAL BOSS — THE CLAMMER\'S HAND!',false,3000);
+  feed('<span class="bad">✋ TWO-STEP FIGHT:</span> 1) <b>Shoot the descending Hand</b> to fill STAGGER until it crashes to the seabed. 2) While it is <b>DOWN</b>, go to town — that is the real damage. 5 cycles. If it grabs you, <b>MASH SPACE</b>!');
+  hud();
+}
+function updateBoss(dt){
+  boss.flash=Math.max(0,boss.flash-dt); boss.t-=dt;
+  const spd=1+boss.cycles*0.13;
+  if(boss.state==='enter'){ boss.x+=(P.x-boss.x)*dt*1.5; boss.y+=(HOVER_Y-boss.y)*dt*1.7;
+    if(boss.t<=0){ boss.state='hover'; boss.t=2.0/spd; } }
+  else if(boss.state==='hover'){ boss.x+=(P.x-boss.x)*dt*(1.1+boss.cycles*0.14); boss.y=HOVER_Y+Math.sin(G.time*1.7)*7;
+    if(boss.t<=0){ boss.state='aim'; boss.t=0.65; boss.tx=P.x; } }
+  else if(boss.state==='aim'){ boss.x+=(boss.tx-boss.x)*dt*4.2;
+    if(boss.t<=0){ boss.state='slam'; SFX.boss(); } }
+  else if(boss.state==='slam'){ boss.y+=1080*spd*dt;
+    if(boss.y>=SLAM_Y){ boss.y=SLAM_Y; G.shake=10; noiseSfx(0.3,0.16); tone(60,0.3,'sine',0.2,-20);
+      burst(boss.x,FLOOR-8,'#e8d9a0',16,220);
+      if(Math.abs(P.x-boss.x)<105&&P.veilT<=0&&P.dashT<=0){ boss.state='grabbed'; boss.t=3.0; boss.grabGot=0; P.grabbed=true; P.hp-=0;
+        banner('✋ GRABBED! MASH SPACE!!!',false,2800,true); feed('<span class="bad">✋ IT HAS YOU!</span> <b>MASH SPACE</b> like your shell depends on it — it does!'); SFX.boss(); }
+      else { boss.state='stuck'; boss.t=0.85; if(boss.stagger>=100) crashHand();
+        else if(Math.abs(P.x-boss.x)<105) feed('<b>FORCE FIELD / DASH SAVED YOU!</b> The fingers close on water.'); } } }
+  else if(boss.state==='grabbed'){ boss.x=P.x; /* clam shake handled in update/draw */
+    if(boss.t<=0){ P.grabbed=false; boss.state='rise'; boss.t=1; hurtPlayer(25,'The Hand squeezed. Mash SPACE faster next grab!'); } }
+  else if(boss.state==='stuck'){ if(boss.stagger>=100) crashHand(); else if(boss.t<=0){ boss.state='rise'; boss.t=1; } }
+  else if(boss.state==='crash'){ boss.y+=820*dt;
+    if(boss.y>=SLAM_Y){ boss.y=SLAM_Y; boss.state='downed'; boss.t=5; boss.phaseDmg=0; G.shake=12; noiseSfx(0.4,0.18); SFX.boss(); } }
+  else if(boss.state==='downed'){ if(boss.t<=0){ boss.state='rise'; boss.t=1; } }
+  else if(boss.state==='rise'){ boss.y-=640*dt; P.grabbed=false;
+    if(boss.y<=HOVER_Y){ boss.y=HOVER_Y; boss.state='hover'; boss.cycles++; boss.stagger=Math.max(0,boss.stagger-25); /* stagger mostly persists between cycles */
+      boss.t=Math.max(0.9,(2.0-boss.cycles*0.18)/spd); feed(`<span class="bad">✋ The Hand rises again…</span> cycle ${boss.cycles+1} — faster now. HP ${Math.ceil(boss.hp)}/500`); } }
+  hud();
+}
+function gameEnd(won, text){
+  G.mode= won?'win':'lose'; bossMusic=false; menaceMusic=false; if(P) P.grabbed=false;
+  $('bossWrap').classList.remove('on');
+  $('endTitle').textContent = won?'🏆 HAND REPELLED!':'SHELL CRACKED!';
+  $('endTitle').style.color = won?'var(--amber)':'#fff';
+  $('endText').textContent = text;
+  $('endScore').textContent = `SCORE ${Math.floor(G.score)} · LEVEL ${P.level} · SIZE ${Math.round(42*P.size)} cm · ELDERS ${P.eaten}/5`;
+  $('endScr').classList.add('on');
+  if(won) SFX.win(); else SFX.boss();
+}
+/* ================= render ================= */
+function drawSprite(img,x,y,w,h,flip=false,alpha=1){
+  if(!img){ return false; }
+  ctx.save(); ctx.globalAlpha=alpha;
+  if(flip){ ctx.translate(x,y); ctx.scale(-1,1); ctx.drawImage(img,-w/2,-h/2,w,h); }
+  else ctx.drawImage(img,x-w/2,y-h/2,w,h);
+  ctx.restore(); return true;
+}
+function px(x,y,w,h,col){ ctx.fillStyle=col; ctx.fillRect(Math.round(x),Math.round(y),w,h); }
+function drawPred(pr){
+  const f=pr.face||1, c=pr.flash>0?'#ffffff':pr.col;
+  ctx.save(); ctx.translate(pr.x,pr.y);
+  if(pr.kind==='crab'){ ctx.scale(f,1);
+    px(-22,-10,44,18,c); px(-32,-18,15,13,c); px(17,-18,15,13,c);
+    px(-18,8,6,10,c); px(-6,8,6,10,c); px(6,8,6,10,c); px(-4,-15,5,5,'#02141d'); px(5,-15,5,5,'#02141d');
+  } else if(pr.kind==='jelly'){
+    px(-16,-20,32,22,c); px(-16,-24,32,6,'#ffffff');
+    for(let i=-2;i<=2;i++){ const sw=Math.sin(G.time*6+pr.ph+i)*4; px(i*7-1,2,3,17,c); px(i*7+sw-1,19,3,8,c); }
+    px(-5,-13,4,4,'#02141d'); px(4,-13,4,4,'#02141d');
+  } else if(pr.kind==='ray'){ ctx.scale(f,1);
+    px(-32,-4,64,9,c); px(-17,-10,34,6,c); px(30,-2,20,3,c); px(-9,-2,5,4,'#02141d');
+  } else if(pr.kind==='octo'){ ctx.scale(f,1);
+    px(-13,-18,26,26,c); px(-13,-22,26,6,c);
+    for(let i=-2;i<=2;i++){ const sw=Math.sin(G.time*8+pr.ph+i*1.3)*5; px(i*6-2,8,4,13,c); px(i*6+sw-2,21,4,6,c); }
+    px(-6,-9,4,5,'#ffe9a0'); px(4,-9,4,5,'#ffe9a0');
+  } else { ctx.restore(); drawFish(pr.x,pr.y,f,pr.col,pr.flash); return; }
+  ctx.restore();
+}
+function drawFish(x,y,face,col,flash){
+  ctx.save(); ctx.translate(x,y); ctx.scale(face,1);
+  const c = flash>0?'#ffffff':col;
+  px(-20,-8,34,16,c); px(12,-5,10,10,c); px(-28,-10,10,20,c); px(-4,-14,12,6,c);
+  px(14,-3,4,4,'#02141d');
+  ctx.restore();
+}
+function drawClam(x,y,s,face,t){
+  const w=86*s, h=74*s, bob=Math.sin(t*3)*2;
+  if(P.grabbed) x+=(Math.random()-0.5)*9; /* shake-free struggle animation */
+  /* Same-clam sheet frames. Two DISTINCT animations:
+     - open/close gape (idle breathing + plankton): open ↔ plain-closed, slow, no teeth
+     - CHOMP attack: without teeth = quick plain snap; with teeth = teeth-bite ↔ teeth-grin */
+  /* Once teeth unlock, the WHOLE animation set swaps to the generated toothed-clam sheet */
+  const hasTeeth=P.abilities.has('teeth');
+  const openF = hasTeeth ? (SPR.tClam||SPR.clam) : SPR.clam;
+  const plainClosed=SPR.clamClosedPlain||SPR.clamClosed||SPR.clam;
+  const closedF = hasTeeth ? (SPR.tClosed||SPR.clamClosedTeeth||plainClosed) : plainClosed;
+  let img=openF;
+  if(P.biteAnimT>0){
+    if(hasTeeth) img = P.biteAnimT>0.15 ? (SPR.tBite||SPR.clamBite||openF) : P.biteAnimT>0.07 ? (SPR.tGrin||SPR.clamClosedTeeth||closedF) : (SPR.tBite||SPR.clamBite||openF);
+    else img = P.biteAnimT>0.10 ? plainClosed : SPR.clam;
+  } else if(P.gapeT>0){ img = P.gapeT>0.17 ? closedF : openF; }
+  else if((t%4.6)>4.25) img = closedF; /* idle breathing close */
+  if(img){ ctx.save(); if(P.hurtT>0&&Math.floor(t*16)%2===0) ctx.globalAlpha=0.45;
+    ctx.translate(x,y+bob); ctx.scale(face,1); ctx.drawImage(img,-w/2,-h/2,w,h); ctx.restore(); }
+  else { px(x-30*s,y-14*s,60*s,30*s,'#2dd4bf'); px(x-24*s,y-26*s,48*s,16*s,'#e8f4f8'); px(x-4*s,y-10*s,10*s,10*s,'#ffe9fb'); }
+  if(P.dashT>0) px(x-face*52*s,y-3,36*s,6,'#7df9ff');
+  /* FORCE FIELD bubble (Phantom Squid power) */
+  if(P.veilT>0){ const r=(58+Math.sin(t*6)*4)*s;
+    ctx.save(); ctx.strokeStyle='rgba(125,249,255,0.9)'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.arc(x,y,r,0,6.29); ctx.stroke();
+    ctx.strokeStyle='rgba(125,249,255,0.35)'; ctx.lineWidth=7;
+    ctx.beginPath(); ctx.arc(x,y,r+5,t*2,t*2+4.2); ctx.stroke();
+    for(let i=0;i<8;i++){ const a=t*2.4+i*0.785; px(x+Math.cos(a)*r-3,y+Math.sin(a)*r-3,6,6,'#7df9ff'); }
+    ctx.fillStyle='#7df9ff'; ctx.font='bold 10px monospace'; ctx.textAlign='center';
+    ctx.fillText('🛡 '+P.veilT.toFixed(1),x,y-r-10); ctx.textAlign='left'; ctx.restore(); }
+}
+function drawBooBoos(cx,cy){ if(!boss) return;
+  const n=Math.floor((1-boss.hp/boss.maxHp)*9); /* more injuries as HP drops */
+  const spots=[[-78,30],[52,-46],[-30,84],[84,52],[2,138],[-96,-24],[38,118],[-58,158],[72,148]];
+  for(let i=0;i<n;i++){ const [ox,oy]=spots[i], bx=cx+ox, by=cy+oy;
+    if(i%3===2){ px(bx-8,by-3,16,6,'#ffffff'); px(bx-3,by-8,6,16,'#ffffff'); px(bx-1,by-1,3,3,'#ff5d4f'); }
+    else { px(bx-9,by,18,4,'#d43a2e'); px(bx-2,by-6,4,15,'#d43a2e'); px(bx+5,by+5,8,3,'#a02820'); } }
+}
+function render(){
+  const sx=(Math.random()-0.5)*G.shake, sy=(Math.random()-0.5)*G.shake;
+  ctx.save(); ctx.translate(sx,sy);
+  /* water */
+  const grd=ctx.createLinearGradient(0,0,0,540);
+  const deep=Math.min(0.55,G.camX/WORLD_W*0.7);
+  grd.addColorStop(0,'#0e5a7d'); grd.addColorStop(0.5,'#083f5f'); grd.addColorStop(1,'#052a44');
+  ctx.fillStyle=grd; ctx.fillRect(-10,-10,980,560);
+  if(SPR.bg){ ctx.save(); ctx.globalAlpha=0.34; const bx=-(G.camX*0.12)%960;
+    ctx.drawImage(SPR.bg,bx,40,960,500); ctx.drawImage(SPR.bg,bx+960,40,960,500); ctx.restore(); }
+  /* god rays */
+  ctx.fillStyle='rgba(190,240,255,0.06)';
+  for(let i=0;i<3;i++){ const rx=((i*340 - G.camX*0.3)%1100+1100)%1100-60;
+    ctx.beginPath(); ctx.moveTo(rx,0); ctx.lineTo(rx+46,0); ctx.lineTo(rx+150,540); ctx.lineTo(rx+60,540); ctx.fill(); }
+  ctx.translate(-G.camX,0);
+  /* depth darkness to the right */
+  ctx.fillStyle=`rgba(2,10,24,${deep})`; ctx.fillRect(G.camX,0,960,540);
+  /* seabed + pixel coral */
+  px(G.camX,FLOOR,960,540-FLOOR,'#0b3d55'); px(G.camX,FLOOR,960,5,'#e8d9a0');
+  for(let i=0;i<44;i++){ const cx=(i*67)%WORLD_W, ch=14+((i*37)%36);
+    if(cx<G.camX-60||cx>G.camX+1020) continue;
+    px(cx,FLOOR-ch,6,ch,i%3?'#ff7a59':'#ffb35c'); px(cx-10,FLOOR-ch,26,9,i%3?'#ff7a59':'#ffb35c');
+    px(cx-14,FLOOR-ch+8,10,7,i%3?'#ff7a59':'#ffb35c'); px(cx+8,FLOOR-ch+6,11,7,i%3?'#ff7a59':'#ffb35c');
+    px(cx-2,FLOOR-ch-7,7,8,'#ffe9a0'); px(cx+12,FLOOR-ch-4,5,6,'#ffe9a0'); }
+  for(let i=0;i<36;i++){ const wx=(i*89)%WORLD_W; if(wx<G.camX-40||wx>G.camX+1000) continue;
+    px(wx,FLOOR-26-((i*13)%22),4,26+((i*13)%22),'#2e8b6e'); }
+  /* boss arena: the shallows (brighter sand bowl past the gate) */
+  px(GATE_X,FLOOR,WORLD_W-GATE_X,540-FLOOR,'#6d5a33'); px(GATE_X,FLOOR,WORLD_W-GATE_X,5,'#ffe9a0');
+  px(GATE_X,0,WORLD_W-GATE_X,540,'rgba(255,244,190,0.05)');
+  px(GATE_X+36,SURF+120,26,366,'#274b66'); px(GATE_X+36,SURF+120,26,10,'#3d6a8a'); px(WORLD_W-90,SURF+90,30,396,'#274b66'); px(WORLD_W-90,SURF+90,30,10,'#3d6a8a');
+  px(GATE_X,SURF,4,420,'rgba(255,201,77,0.6)'); px(GATE_X,SURF,170,22,'rgba(255,93,79,0.3)');
+  ctx.fillStyle='#ffc94d'; ctx.font='bold 12px monospace'; ctx.fillText('▼ THE SHALLOWS — BOSS ARENA ▼',GATE_X+10,SURF+38);
+  /* plankton */
+  for(const f of plankton){ if(f.got) continue; const yy=f.y+Math.sin(G.time*2+f.ph)*5;
+    px(f.x-3,yy-3,6,6,'#7dff9a'); px(f.x-1,yy-5,2,2,'#d8ffe2'); }
+  /* elders (glowing mini-bosses with HP bars) */
+  for(const e of elders){ if(e.eaten) continue;
+    const pulse=1+Math.sin(G.time*4+e.ph)*0.06, w=92*pulse;
+    ctx.save(); ctx.shadowColor='#ffc94d'; ctx.shadowBlur=22; if(e.flash>0) ctx.filter='brightness(2.4)';
+    if(!drawSprite(SPR[e.spr],e.wx,e.wy,w,w*0.9)) drawFish(e.wx,e.wy,1,'#ffc94d',0);
+    ctx.restore();
+    ctx.fillStyle='#ffe9a0'; ctx.font='bold 11px monospace'; ctx.textAlign='center';
+    ctx.fillText('✦ '+e.name.toUpperCase()+' ✦',e.wx,e.wy-58); ctx.textAlign='left';
+    if(e.hpCur<e.hp){ px(e.wx-32,e.wy+50,64,7,'#02141d'); px(e.wx-30,e.wy+52,60*Math.max(0,e.hpCur/e.hp),3,'#ff5d4f'); } }
+  for(const b of ebolts){ px(b.x-4,b.y-4,8,8,'#ff7ad9'); px(b.x-2,b.y-2,4,4,'#fff'); }
+  /* predators + player + boss + shots */
+  for(const pr of preds) drawPred(pr);
+  drawClam(P.x,P.y,P.size,P.face,G.time);
+  if(boss){
+    if(boss.state==='aim'||boss.state==='slam'){ px(boss.tx-110,FLOOR-8,220,8,'rgba(255,60,40,0.6)');
+      ctx.fillStyle='#ff5d4f'; ctx.font='bold 12px monospace'; ctx.fillText('⚠ GRAB!',boss.tx-26,SURF+22); }
+    ctx.save(); if(boss.flash>0) ctx.filter='brightness(2.4)';
+    if(boss.state==='grabbed'){
+      if(!drawSprite(SPR.handGrab||SPR.handOpen,P.x,P.y-16,250,320)) px(P.x-60,P.y-90,120,180,'#c9a06a');
+    } else if(boss.state==='downed'||boss.state==='crash'){
+      if(!drawSprite(SPR.handDown,boss.x,FLOOR-66,390,215)) px(boss.x-150,FLOOR-60,300,50,'#c9a06a');
+      drawBooBoos(boss.x,FLOOR-80);
+    } else {
+      const hurtImg = boss.hp/boss.maxHp<0.45 ? (SPR.handHurt||SPR.handOpen) : SPR.handOpen;
+      if(!drawSprite(hurtImg||SPR.hand,boss.x,boss.y+196,292,392)) px(boss.x-70,boss.y,140,300,'#c9a06a');
+      drawBooBoos(boss.x,boss.y+200);
+    }
+    ctx.restore();
+    if(boss.state==='downed'){ ctx.fillStyle='#ffc94d'; ctx.font='bold 15px monospace'; ctx.textAlign='center';
+      ctx.fillText('✋ DOWN! ATTACK! '+Math.max(0,boss.t).toFixed(1)+'s',boss.x,FLOOR-190); ctx.textAlign='left'; }
+    if(boss.state==='grabbed'){ ctx.fillStyle='#fff'; ctx.font='bold 16px monospace'; ctx.textAlign='center';
+      ctx.fillText('MASH SPACE! ['+'#'.repeat(boss.grabGot)+'-'.repeat(Math.max(0,8-boss.grabGot))+']',P.x,P.y-190); ctx.textAlign='left'; }
+  }
+  for(const s of shots){ px(s.x-8,s.y-4,16,8,'#ff9a3d'); px(s.x-4,s.y-2,8,4,'#ffe9a0'); }
+  for(const p of parts){ ctx.globalAlpha=Math.max(0,p.t*1.8); px(p.x,p.y,p.s,p.s,p.col); ctx.globalAlpha=1; }
+  for(const b of bubbles){ ctx.strokeStyle='rgba(210,245,255,0.6)'; ctx.strokeRect(b.x,b.y,b.s*2,b.s*2); }
+  ctx.restore();
+  if(G.paused){ ctx.fillStyle='rgba(2,16,26,0.65)'; ctx.fillRect(0,0,960,540);
+    ctx.fillStyle='#fff'; ctx.font='bold 26px monospace'; ctx.textAlign='center'; ctx.fillText('❚❚ PAUSED',480,268); ctx.textAlign='left'; }
+}
+/* ================= main loop + wiring ================= */
+let lastT=performance.now();
+function loop(now){
+  requestAnimationFrame(loop);
+  const dt=Math.min(0.05,(now-lastT)/1000); lastT=now;
+  if((G.mode==='play'||G.mode==='boss')&&!G.paused&&P) update(dt);
+  else if(P){ G.time+=dt*0.4; for(const b of bubbles){ b.y-=b.v*dt; if(b.y<SURF-8){b.y=FLOOR-6;b.x=Math.random()*WORLD_W;} } }
+  if(P) render();
+}
+function toggleMusic(){ musicOn=!musicOn; if(master) master.gain.value=musicOn?0.5:0;
+  $('musicBtn').textContent=musicOn?'♪ MUSIC: ON':'♪ MUSIC: OFF'; }
+$('musicBtn').addEventListener('click',()=>{ audio(); toggleMusic(); });
+$('pauseBtn').addEventListener('click',()=>{ if(G.mode==='play'||G.mode==='boss'){ G.paused=!G.paused; $('pauseBtn').textContent=G.paused?'▶ RESUME [P]':'❚❚ PAUSE [P]'; }});
+$('restartBtn').addEventListener('click',()=>{ audio(); reset(); G.mode='play'; G.paused=false; $('titleScr').classList.remove('on'); startMusic(); });
+$('startBtn').addEventListener('click',()=>{ audio(); reset(); G.mode='play'; $('titleScr').classList.remove('on'); startMusic(); SFX.elder();
+  feed('GO! <b>Chomp (SPACE)</b> the Saw Urchin to the east — defeat it to grow <b>TEETH</b>.'); });
+$('againBtn').addEventListener('click',()=>{ audio(); reset(); G.mode='play'; startMusic(); });
+P=playerBase(); reset(); G.mode='title';
+loadSprites(()=>{ segmentSheet(); renderCodex(); });
+requestAnimationFrame(loop);
+</script>
+</body>
+</script>
+</body>
+</html>
