@@ -8,6 +8,7 @@ let fails = 0;
 const check = (name, ok, detail = '') => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}  ${detail}`); if (!ok) fails++; };
 
 const html = fs.readFileSync('index.html', 'utf8');
+check('title is clam simulator', html.includes('<title>clam simulator</title>'));
 
 const m = html.match(/<script>([\s\S]*?)<\/script>/);
 check('inline script found', !!m);

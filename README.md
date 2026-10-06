@@ -1,4 +1,4 @@
-# CLAMQUEST — Pixel Reef RPG
+# clam simulator
 
 **Play: https://grobie01.github.io/clamquest/**
 
